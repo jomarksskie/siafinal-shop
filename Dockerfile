@@ -1,38 +1,52 @@
 FROM php:8.2-apache
 
-# system + php deps
+# -------------------------
+# 1) System + PHP deps
+# -------------------------
 RUN apt-get update && apt-get install -y \
     git unzip libzip-dev libpng-dev libonig-dev libxml2-dev \
     nodejs npm \
     && docker-php-ext-install pdo pdo_mysql zip
 
-# enable apache rewrite
+# Enable apache rewrite
 RUN a2enmod rewrite
 
+# -------------------------
+# 2) Set working dir + copy project
+# -------------------------
 WORKDIR /var/www/html
 COPY . .
 
-# composer
+# -------------------------
+# 3) Composer install
+# -------------------------
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 RUN composer install --no-dev --optimize-autoloader
 
-# vite build
+# -------------------------
+# 4) Vite build (Tailwind/CSS/JS)
+# -------------------------
 RUN npm install && npm run build
 
-# apache should serve /public
-ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' \
-    /etc/apache2/sites-available/*.conf \
-    /etc/apache2/apache2.conf \
-    /etc/apache2/conf-available/*.conf
+# -------------------------
+# 5) Force Apache to serve /public correctly
+# (IMPORTANT FIX: use REAL PATH, no env expansion issues)
+# -------------------------
+RUN sed -ri -e 's!/var/www/html/public!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf \
+    && sed -ri -e 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf \
+    && sed -ri -e 's!/var/www/html!/var/www/html/public!g' /etc/apache2/apache2.conf
 
-# permissions
-RUN chown -R www-data:www-data storage bootstrap/cache
+# -------------------------
+# 6) Permissions (Laravel needs this)
+# -------------------------
+RUN chown -R www-data:www-data storage bootstrap/cache \
+    && chmod -R 775 storage bootstrap/cache
 
-# start script
+# -------------------------
+# 7) Start script
+# -------------------------
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
 EXPOSE 80
-RUN chmod -R 775 storage bootstrap/cache
 CMD ["/start.sh"]
