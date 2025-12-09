@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 set -e
 
-php artisan config:clear
-php artisan cache:clear
+echo "Clearing caches..."
+php artisan config:clear || true
+php artisan cache:clear || true
+php artisan view:clear || true
+
+echo "Running migrations..."
 php artisan migrate --force
 
-php-fpm -D
-nginx -g "daemon off;"
+echo "Starting server..."
+php artisan serve --host 0.0.0.0 --port ${PORT:-10000}
