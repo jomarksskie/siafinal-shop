@@ -1,6 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 
+php artisan config:clear
+php artisan cache:clear
 php artisan migrate --force
 
-exec apache2-foreground
+php-fpm -D
+nginx -g "daemon off;"
